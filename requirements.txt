@@ -1,7 +1,5 @@
 Flask
 Gunicorn
 requests
-json
 threading
-time
 CORS
