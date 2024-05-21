@@ -3,10 +3,10 @@ import requests
 import json
 import threading
 import time
-from flask_cors import CORS  # CORS eklentisi
+#from flask_cors import CORS  # CORS eklentisi
 
 app = Flask(__name__)
-CORS(app)  # CORS eklentisini uygula
+#CORS(app)  # CORS eklentisini uygula
 json_file = "doviz.json"
 
 def download_and_save_json(url, file_path):
