@@ -9,6 +9,8 @@ app = Flask(__name__)
 #CORS(app)  # CORS eklentisini uygula
 json_file = "doviz.json"
 
+appHasRunBefore:bool = False
+
 def download_and_save_json(url, file_path):
     try:
         response = requests.get(url)
@@ -35,9 +37,13 @@ def get_doviz():
     except FileNotFoundError:
         return "Hata: JSON dosyası bulunamadı.", 404
 
-@app.before_first_request
+@app.before_request
 def start_update_thread():
-    # İlk indirme ve ardından belirli aralıklarla güncelleme işlemi için bir thread başlatın
-    download_thread = threading.Thread(target=update_json_periodically, args=("https://api.genelpara.com/embed/doviz.json", json_file, 300))
-    download_thread.daemon = True
-    download_thread.start()
+    global appHasRunBefore
+    if not appHasRunBefore:
+        # İlk indirme ve ardından belirli aralıklarla güncelleme işlemi için bir thread başlatın
+        download_thread = threading.Thread(target=update_json_periodically, args=("https://api.genelpara.com/embed/doviz.json", json_file, 300))
+        download_thread.daemon = True
+        download_thread.start()
+        # Set the bool to True so this method isn't called again
+        appHasRunBefore = True
