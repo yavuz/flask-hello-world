@@ -35,11 +35,9 @@ def get_doviz():
     except FileNotFoundError:
         return "Hata: JSON dosyası bulunamadı.", 404
 
-if __name__ == "__main__":
+@app.before_first_request
+def start_update_thread():
     # İlk indirme ve ardından belirli aralıklarla güncelleme işlemi için bir thread başlatın
     download_thread = threading.Thread(target=update_json_periodically, args=("https://api.genelpara.com/embed/doviz.json", json_file, 300))
     download_thread.daemon = True
     download_thread.start()
-
-    # Flask sunucusunu başlatın
-    app.run(debug=True)
