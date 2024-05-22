@@ -1,53 +1,107 @@
-from flask import Flask, jsonify
 import requests
+from bs4 import BeautifulSoup
 import json
-import threading
-import time
-#from flask_cors import CORS  # CORS eklentisi
+from datetime import datetime, timedelta
+from flask import Flask, jsonify
+import os
 
 app = Flask(__name__)
-#CORS(app)  # CORS eklentisini uygula
-json_file = "doviz.json"
+DATA_FILE = 'prices.json'
+UPDATE_INTERVAL = timedelta(minutes=5)
 
-appHasRunBefore:bool = False
+# Döviz fiyatlarını çekme fonksiyonu
+def get_currency_prices():
+    url = "https://kur.altin.in/banka"
+    response = requests.get(url)
+    soup = BeautifulSoup(response.text, 'html.parser')
 
-def download_and_save_json(url, file_path):
-    try:
-        response = requests.get(url)
-        if response.status_code == 200:
-            with open(file_path, 'wb') as f:
-                f.write(response.content)
-            print(f"JSON dosyası başarıyla indirildi ve kaydedildi: {file_path}")
-        else:
-            print(f"Hata: HTTP {response.status_code} - {response.reason}")
-    except Exception as e:
-        print(f"Hata: {e}")
+    #print(soup)
+    
+    # Döviz fiyatlarını çekeceğimiz tabloyu bulma
+    currency_data = {
+        "Euro": {"Alis": None, "Satis": None},
+        "Dolar": {"Alis": None, "Satis": None}
+    }
 
-def update_json_periodically(url, file_path, interval):
-    while True:
-        download_and_save_json(url, file_path)
-        time.sleep(interval)
+    euro = soup.find("div", {"title": "Euro"})
+    print(euro)
+    currency_data["Euro"]["Alis"] = euro.find("li", {"class": "midrow alis"}).text
+    currency_data["Euro"]["Satis"] = euro.find("li", {"class": "midrow satis"}).text
+
+    usd = soup.find("div", {"title": "Amerikan Doları"})
+    currency_data["Dolar"]["Alis"] = usd.find("li", {"class": "midrow alis"}).text
+    currency_data["Dolar"]["Satis"] = usd.find("li", {"class": "midrow satis"}).text
+            
+    return currency_data
+
+# Altın fiyatlarını çekme fonksiyonu
+def get_gold_prices():
+    url = "https://altin.in/"
+    response = requests.get(url)
+    soup = BeautifulSoup(response.text, 'html.parser')
+    
+    # Verileri saklamak için boş bir dictionary oluştur
+    altin_fiyatlari = {
+        "Gram Altın": {"Alis": None, "Satis": None},
+        "Çeyrek Altın": {"Alis": None, "Satis": None},
+        "Cumhuriyet Altını": {"Alis": None, "Satis": None},
+        "22 Ayar Bilezik": {"Alis": None, "Satis": None},
+        "Tam Altın": {"Alis": None, "Satis": None}
+    }
+
+    # Altın türlerini ve CSS sınıflarını eşleştir
+    altin_turleri = {
+        "Gram Altın": 'Gram Altın',
+        "Çeyrek Altın": 'Çeyrek Altın',
+        "Cumhuriyet Altını": 'Cumhuriyet Altını',
+        "22 Ayar Bilezik": '22 Ayar Bilezik',
+        "Tam Altın": 'Tam Altın'
+    }
+
+    # Her altın türü için alış ve satış fiyatlarını al
+    for altin_turu, title in altin_turleri.items():
+        div = soup.find('div', {'title': title})
+        if div:
+            alis_fiyati = div.find('li', {'class': 'midrow alis'}).text.strip()
+            satis_fiyati = div.find('li', {'class': 'midrow satis'}).text.strip()
+            altin_fiyatlari[altin_turu]["Alis"] = alis_fiyati
+            altin_fiyatlari[altin_turu]["Satis"] = satis_fiyati
+
+                
+    return altin_fiyatlari
+
+def read_prices():
+    if os.path.exists(DATA_FILE):
+        with open(DATA_FILE, 'r') as f:
+            return json.load(f)
+    return {}
+
+def save_prices(data):
+    with open(DATA_FILE, 'w') as f:
+        json.dump(data, f)
+
+def update_prices_if_needed():
+    print("Updating prices if needed...")
+    data = read_prices()
+    last_update = datetime.strptime(data.get('last_update', '1970-01-01T00:00:00'), '%Y-%m-%dT%H:%M:%S')
+    if datetime.utcnow() - last_update > UPDATE_INTERVAL:
+        print("Updating prices...")
+        currency_prices = get_currency_prices()
+        gold_prices = get_gold_prices()
+        data.update(currency_prices)
+        data.update(gold_prices)
+        data['last_update'] = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S')
+        save_prices(data)
+    return data
+
+@app.route('/prices', methods=['GET'])
+def get_prices():
+    data = update_prices_if_needed()
+    return jsonify(data)
 
 @app.route('/')
 def hello_world():
-    return 'Merhaba, Dünya!'
+    return 'Today is today!'
 
-@app.route('/doviz')
-def get_doviz():
-    try:
-        with open(json_file, 'r') as f:
-            data = json.load(f)
-            return jsonify(data)
-    except FileNotFoundError:
-        return "Hata: JSON dosyası bulunamadı.", 404
-
-@app.before_request
-def start_update_thread():
-    global appHasRunBefore
-    if not appHasRunBefore:
-        # İlk indirme ve ardından belirli aralıklarla güncelleme işlemi için bir thread başlatın
-        download_thread = threading.Thread(target=update_json_periodically, args=("https://api.genelpara.com/embed/doviz.json", json_file, 300))
-        download_thread.daemon = True
-        download_thread.start()
-        # Set the bool to True so this method isn't called again
-        appHasRunBefore = True
+if __name__ == '__main__':
+    app.run(debug=True)
