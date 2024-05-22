@@ -28,6 +28,10 @@ def update_json_periodically(url, file_path, interval):
         download_and_save_json(url, file_path)
         time.sleep(interval)
 
+@app.route('/')
+def hello_world():
+    return 'Merhaba, Dünya!'
+
 @app.route('/doviz')
 def get_doviz():
     try:
