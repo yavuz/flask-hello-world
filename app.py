@@ -4,8 +4,10 @@ import json
 from datetime import datetime, timedelta
 from flask import Flask, jsonify
 import os
+from flask_cors import CORS
 
 app = Flask(__name__)
+CORS(app)
 DATA_FILE = 'prices.json'
 UPDATE_INTERVAL = timedelta(minutes=5)
 
