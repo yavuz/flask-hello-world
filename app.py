@@ -26,7 +26,6 @@ def get_currency_prices():
     }
 
     euro = soup.find("div", {"title": "Euro"})
-    print(euro)
     currency_data["Euro"]["Alis"] = euro.find("li", {"class": "midrow alis"}).text
     currency_data["Euro"]["Satis"] = euro.find("li", {"class": "midrow satis"}).text
 
@@ -83,11 +82,9 @@ def save_prices(data):
         json.dump(data, f)
 
 def update_prices_if_needed():
-    print("Updating prices if needed...")
     data = read_prices()
     last_update = datetime.strptime(data.get('last_update', '1970-01-01T00:00:00'), '%Y-%m-%dT%H:%M:%S')
     if datetime.utcnow() - last_update > UPDATE_INTERVAL:
-        print("Updating prices...")
         currency_prices = get_currency_prices()
         gold_prices = get_gold_prices()
         data.update(currency_prices)
